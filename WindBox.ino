@@ -26,7 +26,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define windPut 15
 
 const int leds[6] = {2,3,4,5,6,7};
-const int chaseTune = 75;
+const int chaseTune = 75;  //fine adjustment for the chaser lights
 
 void fastWords(String *message) {      //Prints a string to the display, does not clear display until the next time
   display.clearDisplay();                 //it's called. No Delay.
