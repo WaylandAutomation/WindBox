@@ -66,6 +66,8 @@ pinMode(LED_BUILTIN, OUTPUT);
   for (int i=0; i<6; i++) {
       pinMode(leds[i], OUTPUT);
   }
+pinMode(16, INPUT_PULLUP);
+
 Serial.begin(115200);
 while (!Serial){
     printf("Waiting on Serial Connection\n");
@@ -80,7 +82,7 @@ display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
 display.clearDisplay();
 display.display();
 
-attachInterrupt(digitalPinToInterrupt(windPut), Interrupt, CHANGE);
+attachInterrupt(digitalPinToInterrupt(16), Interrupt, FALLING);
 
 Blink(5);
  printf("Setup Complete\n");
