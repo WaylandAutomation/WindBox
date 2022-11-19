@@ -26,17 +26,16 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define windPut 15
 
 const int leds[6] = {2,3,4,5,6,7};
-//int velocityMap=0;
 const int chaseTune = 75;
 
-void fastWords(String message) {      //Prints a string to the display, does not clear display until the next time
+void fastWords(String *message) {      //Prints a string to the display, does not clear display until the next time
   display.clearDisplay();                 //it's called. No Delay.
   display.setTextSize(2);      // Normal 1:1 pixel scale
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(10, 0);     // Start at top-left corner
   display.cp437(true);         // Use full 256 char 'Code Page 437' font
 
-  display.println(message);
+  display.println(*message);
   display.display();
   }
 
@@ -58,7 +57,12 @@ void Words(String message) {          //Prints a string to the display, holds it
 void Interrupt() {        //ISR to wake up the MCU when the anemometer turns
   sleep_disable();
 
-  //goto main;  
+}
+
+void Pixels(){
+    display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);  //initialize display
+    display.clearDisplay();
+    display.display();
 }
 
 void Blink(int loops) {     //Blink onboard LED 'loops' times in a lopsided blink. Debug without prints
@@ -88,9 +92,7 @@ sleep_enable();           //Setup sleepmode from library, could also use 'IDLE'
 set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   printf("Sleep Mode Eabled\n");
 
-display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);  //initialize display
-display.clearDisplay();
-display.display();
+Pixels(); //Init display
 
 attachInterrupt(digitalPinToInterrupt(16), Interrupt, FALLING);   //init interrupt to wake MCU
 
@@ -99,14 +101,14 @@ Blink(5);
 
 }
 
-//main:
 void loop() {
 cli();    //No Interrupts or the chasers might be unpredictable
+
 static int timeout = millis();
 
-  int velocity = analogRead(windPut); 
-  String velocityMap = String(map(velocity, 0, 1023, 0, 136));
-  fastWords("Windspeed    " + velocityMap +" Knots");
+int velocity = analogRead(windPut); 
+String velocityMap = ("Windspeed    " + String(map(velocity, 0, 1023, 0, 136) + " Knots"));
+  fastWords(&velocityMap);
   //delay(200); printf(velocity);
 
   for (int j=0; j<6; j++) {
@@ -115,6 +117,7 @@ static int timeout = millis();
       digitalWrite(leds[j], LOW);
   }
 sei();    //Set interrupts or MCU will not wake up from Sleep Mode
+
 if (millis()-timeout >9999 && velocity <= 10) {
     timeout = millis();
    // delay(200); printf("Nighty night\n");
