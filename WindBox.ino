@@ -26,20 +26,28 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define windPut 15
 
 const int leds[6] = {2,3,4,5,6,7};
-const int chaseTune = 75;  //fine adjustment for the chaser lights
+const int chaseTune = 150;
+int count = 0;
+int timeout;
+int* pCnt = &count;
+int* pTo = &timeout;
 
-void fastWords(String *message) {      //Prints a string to the display, does not clear display until the next time
+
+
+void fastWords(String message) { 
+       //Prints a string to the display, does not clear display until the next time
   display.clearDisplay();                 //it's called. No Delay.
   display.setTextSize(2);      // Normal 1:1 pixel scale
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(10, 0);     // Start at top-left corner
   display.cp437(true);         // Use full 256 char 'Code Page 437' font
 
-  display.println(*message);
+  display.println(message);
   display.display();
   }
 
-void Words(String message) {          //Prints a string to the display, holds it there for 1.5 sec and clears it.
+void Words(String message) {   
+         //Prints a string to the display, holds it there for 1.5 sec and clears it.
   display.clearDisplay();
   display.setTextSize(2);      // Normal 1:1 pixel scale
   display.setTextColor(SSD1306_WHITE); // Draw white text
@@ -54,18 +62,20 @@ void Words(String message) {          //Prints a string to the display, holds it
   display.display();  
   }
 
-void Interrupt() {        //ISR to wake up the MCU when the anemometer turns
+void Interrupt() {  
+        //ISR to wake up the MCU when the anemometer turns
   sleep_disable();
-
-}
+  }
 
 void Pixels(){
+  
     display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);  //initialize display
     display.clearDisplay();
     display.display();
 }
 
-void Blink(int loops) {     //Blink onboard LED 'loops' times in a lopsided blink. Debug without prints
+void Blink(int loops) {  
+     //Blink onboard LED 'loops' times in a lopsided blink. Debug without prints
   for (int i=0; i<loops; i++) {
     digitalWrite(LED_BUILTIN, HIGH);
     delay(200);
@@ -75,55 +85,65 @@ void Blink(int loops) {     //Blink onboard LED 'loops' times in a lopsided blin
     }
 
 void setup() {
-pinMode(windPut, INPUT);
-pinMode(LED_BUILTIN, OUTPUT);   //setup chaser lights
-  for (int i=0; i<6; i++) {
-      pinMode(leds[i], OUTPUT);
-  }
-pinMode(16, INPUT_PULLUP);  //setup interrupt pin
 
-Serial.begin(115200);
-while (!Serial){
-    printf("Waiting on Serial Connection\n");
-  }
-printf("Serial Connected\n");
+  pinMode(windPut, INPUT);
+  pinMode(LED_BUILTIN, OUTPUT);   //setup chaser lights
+    for (int i=0; i<6; i++) {
+        pinMode(leds[i], OUTPUT);
+    }
+  pinMode(16, INPUT_PULLUP);  //setup interrupt pin
 
-sleep_enable();           //Setup sleepmode from library, could also use 'IDLE'
-set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-  printf("Sleep Mode Eabled\n");
+  Serial.begin(115200);
+  while (!Serial){
+      printf("Waiting on Serial Connection\n");
+    }
+  printf("Serial Connected\n");
 
-Pixels(); //Init display
+  sleep_enable();           //Setup sleepmode from library, could also use 'IDLE'
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    printf("Sleep Mode Eabled\n");
 
-attachInterrupt(digitalPinToInterrupt(16), Interrupt, FALLING);   //init interrupt to wake MCU
+  Pixels(); //Init display
 
-Blink(5);
- printf("Setup Complete\n");
+  attachInterrupt(digitalPinToInterrupt(16), Interrupt, FALLING);   //init interrupt to wake MCU
+
+  Blink(5);
+  printf("Setup Complete\n");
+  Words("Setup\nDone");
 
 }
 
 void loop() {
-cli();    //No Interrupts or the chasers might be unpredictable
 
-static int timeout = millis();
+  if (*pCnt == 0)  {
+      detachInterrupt(digitalPinToInterrupt(16));
+      *pTo = millis();
+      attachInterrupt(digitalPinToInterrupt(16), Interrupt, CHANGE);   //init interrupt to wake MCU
+      }
+      //printf("timeout: %d, count: %d, millis: %d\n", timeout, count, millis());
 
-int velocity = analogRead(windPut); 
-String velocityMap = ("Windspeed    " + String(map(velocity, 0, 1023, 0, 136) + " Knots"));
-  fastWords(&velocityMap);
-  //delay(200); printf(velocity);
 
-  for (int j=0; j<6; j++) {
-      digitalWrite(leds[j], HIGH);
-      delay((1/velocity)*chaseTune);   //delay inverse to input: higher volts => smaller delay/faster chaser lights
-      digitalWrite(leds[j], LOW);
-  }
-sei();    //Set interrupts or MCU will not wake up from Sleep Mode
+  int velocity = analogRead(windPut); 
+  int velocityMap = map(velocity, 0, 1023, 0, 136);
+    fastWords("Windspeed  " + String(velocityMap) + " Knots");
+    //delay(200); 
+    //printf("%d\n", velocity);
 
-if (millis()-timeout >9999 && velocity <= 10) {
-    timeout = millis();
-   // delay(200); printf("Nighty night\n");
-    Words("Night, Night");
-    Blink(2);
-    sleep_enable();
-    sleep_cpu();
-  }
+    for (int j=0; j<6; j++) {
+        digitalWrite(leds[j], HIGH);
+        delay(map(velocity, 0, 1023, 120, 15));   //delay inverse to input: higher volts => smaller delay/faster chaser lights
+        digitalWrite(leds[j], LOW);
+    }
+
+  *pCnt++;
+
+  if (millis()-*pTo >9999 && velocity <= 10) {
+      //timeout = millis();
+    delay(200); printf("Nighty night\n");
+      Words("Goodnight");
+      *pCnt = 0;
+      Blink(2);
+      sleep_enable();
+      sleep_cpu();
+    }
 }
